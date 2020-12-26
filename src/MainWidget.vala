@@ -22,9 +22,8 @@ public class MainWidget : Gtk.Box {
   private IPage[] pages;
   private Cb.BundleHistory history      = new Cb.BundleHistory ();
   private bool page_switch_lock         = false;
-  private ImpostorWidget stack_impostor  = new ImpostorWidget ();
   private Gtk.Box top_box;
-  private Gtk.Stack stack;
+  private Gtk.Box stack;
   private Gtk.Revealer topbar_revealer;
   public int cur_page_id {
     get {
@@ -50,12 +49,10 @@ public class MainWidget : Gtk.Box {
     topbar_revealer.add (top_box);
     this.add (topbar_revealer);
 
-    this.stack = new Gtk.Stack ();
+    this.stack = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 0);
     stack.set_hexpand (true);
     stack.set_vexpand (true);
     this.add (stack);
-
-    stack.add (stack_impostor);
 
     pages     = new IPage[11];
     pages[0]  = new HomeTimeline (Page.STREAM, account);
@@ -79,6 +76,7 @@ public class MainWidget : Gtk.Box {
         account.user_stream.register ((Cb.MessageReceiver)page);
 
       page.create_radio_button (dummy_button);
+      page.no_show_all = true;
       stack.add (page);
       if (page.get_radio_button () != null) {
         top_box.add (page.get_radio_button ());
@@ -115,13 +113,6 @@ public class MainWidget : Gtk.Box {
 
     bool push = true;
 
-
-    // Set the correct transition type
-    if (page_id == Page.PREVIOUS || page_id < history.get_current ())
-      stack.transition_type = Gtk.StackTransitionType.SLIDE_RIGHT;
-    else if (page_id == Page.NEXT || page_id > history.get_current ())
-      stack.transition_type = Gtk.StackTransitionType.SLIDE_LEFT;
-
     int current_page = history.get_current ();
     // If we go forward/back, we don't need to update the history.
     if (page_id == Page.PREVIOUS) {
@@ -138,14 +129,6 @@ public class MainWidget : Gtk.Box {
       push = false;
       page_id = history.forward ();
       args = history.get_current_bundle ();
-    }
-
-    if (page_id == current_page) {
-      stack_impostor.clone (pages[page_id]);
-      var transition_type = stack.transition_type;
-      stack.transition_type = Gtk.StackTransitionType.NONE;
-      stack.set_visible_child (stack_impostor);
-      stack.transition_type = transition_type;
     }
 
     if (current_page != -1)
@@ -171,8 +154,17 @@ public class MainWidget : Gtk.Box {
     /* on_join first, then set_visible_child so the new page is still !child-visible,
        so e.g. GtkStack transitions inside the page aren't animated */
     page.on_join (page_id, args);
-    stack.set_visible_child (pages[page_id]);
-    ((MainWindow)this.parent).set_window_title (page.get_title (), stack.transition_type);
+    if (page_id != current_page) {
+      if (current_page != -1) {
+        pages[current_page].hide();
+      }
+      // We want no-show-all by default to prevent all pages showing at once
+      // But that seemingly also prevents us showing the widget and its children!
+      pages[page_id].no_show_all = false;
+      pages[page_id].show_all();
+      pages[page_id].no_show_all = true;
+    }
+    ((MainWindow)this.parent).set_window_title (page.get_title (), Gtk.StackTransitionType.CROSSFADE);
 
     page_switch_lock = false;
 
