@@ -20,8 +20,11 @@ public class MainWidget : Gtk.Box {
 
   private Gtk.RadioButton dummy_button  = new Gtk.RadioButton (null);
   private IPage[] pages;
+  private Gtk.Revealer[] revealers;
   private Cb.BundleHistory history      = new Cb.BundleHistory ();
   private bool page_switch_lock         = false;
+  private ImpostorWidget stack_impostor  = new ImpostorWidget ();
+  private Gtk.Revealer imposter_revealer = new Gtk.Revealer();
   private Gtk.Box top_box;
   private Gtk.Box stack;
   private Gtk.Revealer topbar_revealer;
@@ -53,7 +56,13 @@ public class MainWidget : Gtk.Box {
     stack.set_hexpand (true);
     stack.set_vexpand (true);
     this.add (stack);
+    
+    this.imposter_revealer = new Gtk.Revealer();
+    imposter_revealer.no_show_all = true;
+    imposter_revealer.add(stack_impostor);
+    stack.add (imposter_revealer);
 
+    revealers = new Gtk.Revealer[11];
     pages     = new IPage[11];
     pages[0]  = new HomeTimeline (Page.STREAM, account);
     pages[1]  = new MentionsTimeline (Page.MENTIONS, account);
@@ -76,8 +85,12 @@ public class MainWidget : Gtk.Box {
         account.user_stream.register ((Cb.MessageReceiver)page);
 
       page.create_radio_button (dummy_button);
-      page.no_show_all = true;
-      stack.add (page);
+      page.show_all();
+      var revealer = new Gtk.Revealer();
+      revealers[i] = revealer;
+      revealer.no_show_all = true;
+      revealer.add(page);
+      stack.add (revealer);
       if (page.get_radio_button () != null) {
         top_box.add (page.get_radio_button ());
         page.get_radio_button ().clicked.connect (() => {
@@ -113,7 +126,26 @@ public class MainWidget : Gtk.Box {
 
     bool push = true;
 
+    Gtk.RevealerTransitionType revealer_transition_type = Gtk.RevealerTransitionType.CROSSFADE;
+    Gtk.StackTransitionType stack_transition_type = Gtk.StackTransitionType.CROSSFADE;
+
+    // Set the correct transition type
+    if (page_id == Page.PREVIOUS || page_id < history.get_current ()) {
+      stack_transition_type = Gtk.StackTransitionType.SLIDE_RIGHT;
+      revealer_transition_type = Gtk.RevealerTransitionType.SLIDE_RIGHT;
+    }
+    else if (page_id == Page.NEXT || page_id > history.get_current ()) {
+      stack_transition_type = Gtk.StackTransitionType.SLIDE_LEFT;
+      revealer_transition_type = Gtk.RevealerTransitionType.SLIDE_LEFT;
+    }
+
     int current_page = history.get_current ();
+    Gtk.Revealer? cur_revealer = null;
+    
+    if (current_page != -1) {
+      cur_revealer = revealers[current_page];
+    }
+
     // If we go forward/back, we don't need to update the history.
     if (page_id == Page.PREVIOUS) {
       if (history.at_start ())
@@ -129,6 +161,18 @@ public class MainWidget : Gtk.Box {
       push = false;
       page_id = history.forward ();
       args = history.get_current_bundle ();
+    }
+    
+    if (page_id == current_page && cur_revealer != null) {
+      // FIXME: Self-transition for tweet pages isn't transitioning
+      stack_impostor.clone (pages[page_id]);
+      imposter_revealer.transition_type = Gtk.RevealerTransitionType.NONE;
+      cur_revealer.transition_type = Gtk.RevealerTransitionType.NONE;
+      cur_revealer.set_reveal_child(false);
+      cur_revealer.hide();
+      imposter_revealer.show();
+      imposter_revealer.set_reveal_child(true);
+      cur_revealer = imposter_revealer;
     }
 
     if (current_page != -1)
@@ -154,17 +198,18 @@ public class MainWidget : Gtk.Box {
     /* on_join first, then set_visible_child so the new page is still !child-visible,
        so e.g. GtkStack transitions inside the page aren't animated */
     page.on_join (page_id, args);
-    if (page_id != current_page) {
-      if (current_page != -1) {
-        pages[current_page].hide();
-      }
-      // We want no-show-all by default to prevent all pages showing at once
-      // But that seemingly also prevents us showing the widget and its children!
-      pages[page_id].no_show_all = false;
-      pages[page_id].show_all();
-      pages[page_id].no_show_all = true;
+    if (cur_revealer != null) {
+      cur_revealer.transition_type = revealer_transition_type;
+      cur_revealer.set_reveal_child(false);
+      GLib.Timeout.add(cur_revealer.get_transition_duration(), () => { cur_revealer.hide(); return GLib.Source.REMOVE; });
     }
-    ((MainWindow)this.parent).set_window_title (page.get_title (), Gtk.StackTransitionType.CROSSFADE);
+
+    var new_revealer = revealers[page_id];
+    new_revealer.transition_type = revealer_transition_type;
+    new_revealer.show();
+    new_revealer.show_all();
+    new_revealer.set_reveal_child(true);
+    ((MainWindow)this.parent).set_window_title (page.get_title (), stack_transition_type);
 
     page_switch_lock = false;
 
