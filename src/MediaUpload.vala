@@ -37,6 +37,9 @@
         else if (filename.has_suffix(".webp")) {
           return "image/webp";
         }
+        else if (filename.has_suffix(".png")) {
+          return "image/png";
+        }
         else {
           return "video/mp4";
         }
