@@ -34,7 +34,7 @@
         else if (filename.has_suffix(".jpg") || filename.has_suffix(".jpeg")) {
           return "image/jpeg";
         }
-        elseif (filename.has_suffix(".webp")) {
+        else if (filename.has_suffix(".webp")) {
           return "image/webp";
         }
         else {
