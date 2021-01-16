@@ -705,9 +705,12 @@ namespace TweetUtils {
     Json.Node root;
     try {
       root = yield Cb.Utils.load_threaded_async(init_call, cancellable);
+      debug("Completed call");
     }
     catch (GLib.Error e) {
-      media_upload.progress_complete(TweetUtils.failed_request_to_error (init_call, e));
+      var err = TweetUtils.failed_request_to_error (init_call, e);
+      warning("INIT failed - %s", err.message);
+      media_upload.progress_complete(err);
       return false;
     }
 
@@ -717,11 +720,14 @@ namespace TweetUtils {
     }
 
     media_upload.media_id = root.get_object().get_int_member("media_id");
+    debug("JSON was not null. Got media ID %lld", media_upload.media_id);
     GLib.FileInputStream file_reader = null;
     try {
       file_reader = media_upload.read();
+      debug("Got file handle");
     }
     catch (GLib.Error e) {
+      warning("Error getting file handle: %s", e.message);
       media_upload.progress_complete(e);
       return false;
     }
@@ -734,9 +740,12 @@ namespace TweetUtils {
       var append_call = upload_proxy.new_call();
       GLib.Bytes chunk;
       try {
+        debug("Reading bytes for chunk %d…", chunk_idx);
         chunk = file_reader.read_bytes(MAX_CHUNK_SIZE);
+        debug("Read chunk of %lu bytes", chunk.get_size());
       }
       catch (GLib.Error e) {
+        warning("Error reading chunk: %s", e.message);
         media_upload.progress_complete(e);
         return false;
       }
@@ -752,11 +761,16 @@ namespace TweetUtils {
         // Use a helper object to work around Vala only expecting a calback to be called once before freeing its closure,
         // which causes segfaults
         var upload_progress = new UploadProgress(media_upload, filesize, total_uploaded, upload_media.callback);
+        debug("Calling upload");
         append_call.upload(upload_progress.callback, cancellable);
+        debug("Awaiting upload completion");
         yield;
+        debug("Chunk uploaded");
       }
       catch (GLib.Error e) {
-        media_upload.progress_complete(TweetUtils.failed_request_to_error (append_call, e));
+        var err = TweetUtils.failed_request_to_error (append_call, e);
+        warning("Error uploading chunk: %s", err.message);
+        media_upload.progress_complete(err);
         return false;
       }
 
@@ -765,6 +779,7 @@ namespace TweetUtils {
       chunk_idx++;
     }
 
+    debug("Finalising upload");
     var finalise_call = upload_proxy.new_call();
     finalise_call.set_function("1.1/media/upload.json");
     finalise_call.set_method("POST");
