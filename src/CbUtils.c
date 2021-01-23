@@ -516,16 +516,20 @@ parse_json_async (GTask        *task,
   JsonNode *root_node;
   GError *error = NULL;
 
+  g_debug("Parsing JSON");
+
   parser = json_parser_new ();
   json_parser_load_from_data (parser, payload, -1, &error);
   if (error)
     {
+      g_debug("Error parsing JSON");
       g_task_return_error (task, error);
       return;
     }
 
   if (g_cancellable_is_cancelled (cancellable))
     {
+      g_debug("Cancellable cancelled");
       g_task_return_pointer (task, NULL, NULL);
       return;
     }
@@ -533,7 +537,7 @@ parse_json_async (GTask        *task,
   root_node = json_parser_get_root (parser);
 
   g_assert (root_node);
-
+  g_debug("Got JSON node");
   g_task_return_pointer (task, json_node_ref (root_node), (GDestroyNotify)json_node_unref);
   g_object_unref (parser);
 }
@@ -548,6 +552,14 @@ call_done_cb (GObject      *source_object,
   GError *error = NULL;
   char *payload;
 
+#ifdef DEBUG
+  {
+    char *s = cb_utils_rest_proxy_call_to_string (call);
+    g_debug ("REST: %s finished", s);
+    g_free (s);
+  }
+#endif
+
   /* Get the json data, run another GTask that actually parses the json and returns the root node */
   rest_proxy_call_invoke_finish (call, result, &error);
   if (error != NULL)
@@ -556,12 +568,16 @@ call_done_cb (GObject      *source_object,
         {
           g_warning ("%s(%s): %p, %s %s", __FILE__, __FUNCTION__, call, rest_proxy_call_get_function(call), error->message);
         }
+        else {
+          g_debug("Invoke finish got G_IO_ERROR_CANCELLED");
+        }
 
       g_task_return_error (task, error);
       return;
     }
 
   payload = g_strdup(rest_proxy_call_get_payload (call));
+  g_debug("call_done_cb payload: %s", payload);
 
   g_task_set_task_data (task, payload, g_free);
   g_task_run_in_thread (task, parse_json_async);
