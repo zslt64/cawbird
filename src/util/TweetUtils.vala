@@ -679,9 +679,12 @@ namespace TweetUtils {
         return;
       }
 
+      debug("Upload progress: %lu of %lu", uploaded, total);
+
       _upload.progress = (_total_uploaded + uploaded) / _filesize;
 
       if (total == uploaded) {
+        debug("Finished uploading chunk");
         _cb();
         return;
       }
