@@ -850,7 +850,7 @@ public class TweetListEntry : Cb.TwitterItem, Gtk.ListBoxRow {
   }
 
   public override void size_allocate(Gtk.Allocation allocation) {
-    if ((allocation.width < Cawbird.RESPONSIVE_LIMIT) != (get_allocated_width() < Cawbird.RESPONSIVE_LIMIT) || get_allocated_width() == 1) {
+    if ((allocation.width < Cawbird.RESPONSIVE_LIMIT) != (get_allocated_width() < Cawbird.RESPONSIVE_LIMIT) || get_allocated_width() <= 1) {
       debug("Allocating new size after crossing threshold - was %d now %d", get_allocated_width(), allocation.width);
       // We've crossed the threshold, so reallocate as appropriate
       if (allocation.width < Cawbird.RESPONSIVE_LIMIT) {
