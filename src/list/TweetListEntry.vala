@@ -878,7 +878,7 @@ public class TweetListEntry : Cb.TwitterItem, Gtk.ListBoxRow {
     var new_size_is_responsive = new_width < Cawbird.RESPONSIVE_LIMIT;
     var cur_size_is_responsive = cur_width < Cawbird.RESPONSIVE_LIMIT;
 
-    if (new_size_is_responsive != cur_size_is_responsive || cur_width == 1) {
+    if (new_size_is_responsive != cur_size_is_responsive || cur_width <= 1) {
       // We've crossed the threshold, so reallocate as appropriate
       if (new_size_is_responsive) {
         grid.child_set (avatar_image, "height", 2);
